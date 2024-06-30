@@ -9,12 +9,15 @@ module insurance::insurance {
     const EInvalidStartTime: u64 = 2;
     const EInvalidAccount: u64 = 3;
 
+    // Represents the insurance contract
     public struct INSURANCE has drop {}
 
+    // Represents the capability of an administrator
     public struct AdminCap has key {
         id: UID
     }
 
+    // Represents an insurance policy with two types of coins
     public struct Policy<phantom CoverCoin, phantom PremiumCoin> has key, store {
         id: UID,
         premiums_per_second: u64,
@@ -27,11 +30,13 @@ module insurance::insurance {
         owned_by: ID,
     }
 
+    // Represents a capability tied to a specific policy
     public struct PolicyCap has key, store {
         id: UID,
         policy: ID,
     }
 
+    // Represents a holder of an insurance policy
     public struct Holder<phantom CoverCoin, phantom PremiumCoin> has key, store {
         id: UID,
         policy_id: ID,
@@ -40,6 +45,7 @@ module insurance::insurance {
     }
 
     // Initialization function for the insurance module
+    // Sets up the AdminCap and transfers it to the contract creator
     fun init(_wtn: INSURANCE, ctx: &mut TxContext) {
         transfer::transfer(AdminCap { id: object::new(ctx) }, ctx.sender());
     }
@@ -225,7 +231,9 @@ module insurance::insurance {
         c: &Clock,
         premium: Coin<PremiumCoin>,
     ) {
+        // Update policy state
         update(policy, clock_timestamp_s(c));
+        // Add the premium amount to the policy's premium balance
         policy.balance_premium_coin.join(premium.into_balance());
     }
 
@@ -242,11 +250,13 @@ module insurance::insurance {
         cover_factor: u64,
         accrued_coverage_per_share: u256,
     ): u64 {
+        // Calculate the pending coverage based on the holder's coverage amount, accrued coverage per share, and cover factor
         ((((holder.coverage_amount as u256) * accrued_coverage_per_share) / (cover_factor as u256)) - holder.claim_debt) as u64
     }
 
     // Function to update the policy state
     fun update<CoverCoin, PremiumCoin>(policy: &mut Policy<CoverCoin, PremiumCoin>, now: u64) {
+        // Skip update if the policy's last update timestamp is in the future or the policy hasn't started yet
         if (policy.last_update_timestamp >= now || policy.start_timestamp > now) {
             return()
         };
@@ -255,12 +265,14 @@ module insurance::insurance {
         let prev_update_timestamp = policy.last_update_timestamp;
         policy.last_update_timestamp = now;
 
+        // Skip update if there is no covered value
         if (total_covered_value == 0) {
             return()
         };
 
         let total_premium_value = balance::value(&policy.balance_premium_coin);
 
+        // Calculate the new accrued coverage per share
         policy.accrued_coverage_per_share = calculate_accrued_coverage_per_share(
             policy.premiums_per_second,
             policy.accrued_coverage_per_share,
@@ -286,7 +298,9 @@ module insurance::insurance {
         let cover_factor = cover_factor as u256;
         let timestamp_delta = timestamp_delta as u256;
 
+        // Calculate the premium based on the elapsed time and premiums per second
         let premium = min(total_premium_value, premiums_per_second * timestamp_delta);
+        // Update the accrued coverage per share based on the premium and total covered tokens
         last_accrued_coverage_per_share + ((premium * cover_factor) / total_covered_token)
     }
 
@@ -294,6 +308,7 @@ module insurance::insurance {
     public fun calculate_claim_debt(coverage_amount: u64, cover_factor: u64, accrued_coverage_per_share: u256): u256 {
         let coverage_amount = coverage_amount as u256;
         let cover_factor = cover_factor as u256;
+        // Calculate the claim debt based on the coverage amount, cover factor, and accrued coverage per share
         (coverage_amount * accrued_coverage_per_share) / cover_factor
     }
 
