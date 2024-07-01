@@ -7,7 +7,8 @@ module insurance::helpers {
         clock::{Self}
     };    
     use insurance::insurance::{init_for_testing};
-
+    use insurance::usdc::{init_for_testing_usdc};
+    
     // === Constants ===
     const ADMIN: address = @0xA;
 
@@ -18,8 +19,9 @@ module insurance::helpers {
  
        {
         init_for_testing(ts::ctx(scenario));
-        let clock = clock::create_for_testing(scenario.ctx());
-        clock::share_for_testing(clock);
+       };
+       {
+        init_for_testing_usdc(ts::ctx(scenario));
        };
        scenario_val
     }
