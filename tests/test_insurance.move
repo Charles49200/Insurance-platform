@@ -57,12 +57,56 @@ module insurance::test_insurance {
             ts::return_shared(policy);
         };
 
+         // TEST_ADDRESS2 creating holder
+        next_tx(scenario, TEST_ADDRESS2);
+        { 
+            let policy = ts::take_shared<Policy<USDC, SUI>>(scenario);
+            let holder = ts::take_from_sender<Holder<USDC, SUI>>(scenario);
+            let time = ts::take_shared<Clock>(scenario);
 
+            let pending_covarage = insurance::pending_coverage<USDC, SUI>(&policy, &holder, &time);
+            // it should be equal to 0 
+            assert_eq(pending_covarage, 0);
 
+            ts::return_shared(time);
+            ts::return_shared(policy);
+            ts::return_to_sender(scenario, holder);
+        };
+        // Admin should add PremiumCoin to share object for liq
+         next_tx(scenario, TEST_ADDRESS1);
+        { 
+            let mut policy = ts::take_shared<Policy<USDC, SUI>>(scenario);
+            let time = ts::take_shared<Clock>(scenario);
+            let premium_coin =coin::mint_for_testing<SUI>(1000_000_000_000, ts::ctx(scenario));
 
-
-
+            insurance::add_premiums<USDC, SUI>(&mut policy, &time,premium_coin);
         
+            ts::return_shared(time);
+            ts::return_shared(policy);
+        };
+        // TEST_ADDRESS2 calls purchase_coverage function for premiumCoin
+         next_tx(scenario, TEST_ADDRESS2);
+        { 
+            let mut policy = ts::take_shared<Policy<USDC, SUI>>(scenario);
+            let mut holder = ts::take_from_sender<Holder<USDC, SUI>>(scenario);
+            let time = ts::take_shared<Clock>(scenario);
+            let cover_coin =coin::mint_for_testing<USDC>(10000_000_000_000, ts::ctx(scenario));
+
+            let premium_coin = insurance::purchase_coverage<USDC, SUI>(
+                &mut policy,
+                &mut holder,
+                cover_coin,
+                &time,
+                ts::ctx(scenario)
+                );
+
+            assert_eq(coin::value(&premium_coin), 10);
+            transfer::public_transfer(premium_coin, TEST_ADDRESS2);
+
+            ts::return_shared(time);
+            ts::return_shared(policy);
+            ts::return_to_sender(scenario, holder);
+        };
         ts::end(scenario_test);
     }
 }   
